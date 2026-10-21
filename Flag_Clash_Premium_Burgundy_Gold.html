@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#330505">
+<title>Flag Clash — Nation Battle</title>
+<style>
+:root{--bg:#330505;--panel:#330505;--line:#6f5734;--text:#F8F5EC;--muted:#D6C3A2;--cyan:#B0A06A;--pink:#A26B4A}
+*{box-sizing:border-box} body{margin:0;background:radial-gradient(ellipse at top,#5b2920 0%,#330505 60%);color:var(--text);font-family:system-ui,-apple-system,"Noto Sans Bengali",sans-serif;min-height:100vh}
+.app{max-width:760px;margin:auto;padding:14px 12px 24px}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 2px 12px}
+.brand{display:flex;align-items:center;gap:10px}.logo{width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,#D6C3A2,#B0A06A);display:grid;place-items:center;font-size:23px;box-shadow:0 0 20px #B0A06A30}
+h1{font-size:20px;line-height:1.1;margin:0;letter-spacing:.5px} .sub{font-size:11px;color:var(--muted);margin-top:4px}
+.live{border:1px solid #B0A06A;background:#330505;color:#B0A06A;border-radius:99px;padding:7px 10px;font-size:11px;font-weight:800;white-space:nowrap}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}.stat{background:#330505;border:1px solid var(--line);border-radius:15px;padding:10px 8px;text-align:center}.stat b{display:block;font-size:21px;line-height:1.2;font-variant-numeric:tabular-nums}.stat span{font-size:10px;color:var(--muted);letter-spacing:.4px}
+.arena-wrap{position:relative;border:1px solid #B0A06A;border-radius:22px;overflow:hidden;background:#330505;box-shadow:0 18px 50px #0007}
+canvas{display:block;width:100%;height:auto;aspect-ratio:1/1;touch-action:manipulation}
+/* Clean capture view: only the animated arena remains visible. Double-tap or press Escape to exit. */
+body.capture-mode{overflow:hidden;background:#330505}
+body.capture-mode .app{max-width:none;width:100%;height:100dvh;padding:0;margin:0;display:flex;align-items:center;justify-content:center}
+body.capture-mode .app>header,body.capture-mode .app>.stats,body.capture-mode .app>.controls,body.capture-mode .app>.settings,body.capture-mode .app>.mine-legend,body.capture-mode .app>.countrybox,body.capture-mode .app>.note{display:none!important}
+body.capture-mode .arena-wrap{width:min(100vw,100dvh);height:min(100vw,100dvh);border:0;border-radius:0;box-shadow:none;display:flex;align-items:center;justify-content:center}
+body.capture-mode canvas{width:100%;height:100%;aspect-ratio:1/1}
+body.capture-mode .arena-label,body.capture-mode .toast{display:none!important}
+.capture-hud{display:none;position:fixed;left:9px;top:64px;z-index:5;max-width:calc(100% - 18px);pointer-events:none}
+.capture-hud-stats{display:flex;gap:5px;flex-wrap:wrap}
+.capture-chip{background:#330505ed;border:1px solid #B0A06A66;border-radius:8px;padding:4px 6px;box-shadow:0 2px 8px #0005;backdrop-filter:blur(5px);min-width:66px}
+.capture-chip b{display:block;font-size:13px;line-height:1.15;color:#F8F5EC;font-variant-numeric:tabular-nums}
+.capture-chip span{display:block;font-size:8px;line-height:1.2;color:#D6C3A2;margin-top:2px;white-space:nowrap}
+.capture-country-counts{position:fixed;left:9px;top:112px;bottom:auto;z-index:5;display:none;width:150px;max-width:38vw;max-height:20vh;overflow:hidden;flex-direction:column;gap:3px;padding:6px;background:#330505ed;border:1px solid #B0A06A66;border-radius:9px;backdrop-filter:blur(5px);pointer-events:none}
+.capture-country-counts .mini-title{font-size:8px;color:#D6C3A2;font-weight:900;letter-spacing:.5px;margin-bottom:2px;padding-bottom:3px;border-bottom:1px solid #B0A06A55}
+.capture-country-counts .mini-country{display:flex;align-items:center;gap:4px;font-size:9px;line-height:1.1;white-space:nowrap;color:#fff}
+.capture-country-counts .mini-flag{font-size:11px;min-width:15px;text-align:center}
+.capture-country-counts .mini-name{overflow:hidden;text-overflow:ellipsis;max-width:80px}
+.capture-country-counts .mini-count{margin-left:auto;color:#B0A06A;font-weight:900;padding-left:5px}
+body.capture-mode .capture-hud{display:block}body.capture-mode .capture-country-counts{display:flex}
+#captureExit{display:none;position:fixed;right:10px;top:10px;z-index:9999;border-radius:999px;background:#330505;color:#F8F5EC;border:1px solid #B0A06A;padding:8px 12px;font-size:12px}
+body.capture-mode #captureExit{display:block;opacity:.12}#captureRefresh{display:none;position:fixed;right:10px;top:58px;z-index:9999;border-radius:999px;background:#330505;color:#F8F5EC;border:1px solid #B0A06A;padding:8px 12px;font-size:12px}body.capture-mode #captureRefresh{display:block;opacity:.8}body.capture-mode #captureExit:active,body.capture-mode #captureExit:focus{opacity:1}
+.arena-label{position:absolute;top:11px;left:12px;padding:6px 9px;border:1px solid #B0A06A;background:#330505d9;border-radius:10px;color:#D6C3A2;font-size:10px;pointer-events:none}
+.toast{position:absolute;right:8px;top:8px;left:auto;transform:none;background:#330505ed;border:1px solid #B0A06A88;border-radius:10px;padding:5px 7px;text-align:left;box-shadow:0 0 14px #B0A06A22;pointer-events:none;width:max-content;max-width:43%;transition:opacity .2s;z-index:2}.toast strong{display:block;font-size:11px;line-height:1.25}.toast small{display:block;color:#D6C3A2;font-size:9px;line-height:1.25;margin-top:2px}
+.controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:10px 0}
+button,select{font:inherit;color:var(--text);border:1px solid #6f5734;background:#330505;border-radius:13px;padding:11px 7px;min-width:0}
+button{font-size:11px;font-weight:800;cursor:pointer}button:active{transform:scale(.98)}.primary{background:linear-gradient(135deg,#D6C3A2,#B0A06A);border:0;color:#330505}.danger{background:#A26B4A;border-color:#A26B4A;color:#F8F5EC}
+.settings{display:grid;grid-template-columns:1fr 1fr;gap:10px;background:#330505;border:1px solid var(--line);border-radius:17px;padding:13px}
+.setting{min-width:0}.setting label{display:flex;justify-content:space-between;gap:5px;color:#D6C3A2;font-size:12px;margin-bottom:7px}.setting output{color:#B0A06A;font-weight:800}
+input[type=range]{width:100%;accent-color:#B0A06A}
+.selected-countries button{border:1px solid #B0A06A;background:#330505;color:#F8F5EC;border-radius:999px;padding:6px 9px;font-size:11px}.selected-countries button .check{color:#B0A06A;font-weight:900}.selected-countries button .remove{color:#A26B4A;font-weight:900;margin-left:5px}.countrybox{margin-top:10px;background:#330505;border:1px solid var(--line);border-radius:17px;padding:12px}
+.rowtitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.rowtitle strong{font-size:13px}.rowtitle span{font-size:10px;color:var(--muted)}
+.countries{display:flex;flex-wrap:wrap;gap:7px}
+.country{display:flex;align-items:center;gap:6px;background:#330505;border:1px solid #6f5734;border-radius:11px;padding:7px 9px;font-size:12px;color:#F8F5EC}
+.mine-legend{font-size:10px;color:#D6C3A2;margin-top:8px}
+.setting{min-width:0}.setting label{font-size:11px}
+.country .flag{font-size:24px;line-height:1.2;display:inline-block;min-width:30px;text-align:center;text-shadow:0 1px 3px #000;filter:drop-shadow(0 1px 1px #000)}.country b{font-size:11px;color:#B0A06A}.country-pick{cursor:pointer;text-align:left;flex:0 0 auto}.country-pick:active{border-color:#B0A06A}.country-pick:focus{outline:2px solid #B0A06A}
+.note{color:#D6C3A2;font-size:11px;line-height:1.55;margin:10px 3px 0}
+@media(min-width:600px){.app{padding:22px}.stats b{font-size:24px}.controls button{font-size:13px}}
+</style>
+</head>
+<body>
+<button id="captureExit" aria-label="Exit capture view">Exit Capture</button><button id="captureRefresh" aria-label="Restart simulation">↻ Refresh</button>
+<div class="app">
+<header>
+ <div class="brand"><div class="logo">⚡</div><div><h1>FLAG CLASH</h1><div class="sub">NATION BATTLE · PHYSICS ARENA</div></div></div>
+ <div class="live">● LIVE SIMULATION</div>
+</header>
+<section class="stats">
+ <div class="stat"><b id="total">8</b><span>Total Balls</span></div>
+ <div class="stat"><b id="hits">0</b><span>Giant Ball Hits</span></div>
+ <div class="stat"><b id="leader">🇧🇩</b><span>Leading Country</span></div>
+</section>
+<div class="arena-wrap">
+ <canvas id="arena" width="720" height="720" aria-label="Flag Clash simulation arena"></canvas>
+ <div class="arena-label">GIANT BALL vs NATIONS</div>
+ <div class="toast" id="toast"><strong>🌍 FLAG CLASH</strong><small>A hit creates another ball for that country!</small></div>
+ <div class="capture-hud" aria-live="polite"><div class="capture-hud-stats">
+  <div class="capture-chip"><b id="captureLeader">🇧🇩</b><span>LEADING COUNTRY</span></div>
+  <div class="capture-chip"><b id="captureHits">0</b><span>GIANT BALL HITS</span></div>
+  <div class="capture-chip"><b id="captureTotal">8</b><span>TOTAL BALLS</span></div>
+ </div></div>
+ <div class="capture-country-counts" id="captureCountryCounts"><div class="mini-title">COUNTRY BALLS</div><div id="captureCountryList"></div></div>
+</div>
+<div class="controls">
+ <button class="primary" id="play">▶ Play</button>
+ <button id="add">＋ Add Balls</button>
+ <button id="slow">🐢 Slow-Mo</button>
+ <button id="music">♫ Music Off</button>
+ <button id="capture">⛶ Capture View</button>
+ <button class="danger" id="reset">↻ Reset</button>
+</div>
+
+<section class="countrybox" id="languageSettings">
+ <div class="rowtitle"><strong>🌐 Language Settings</strong><span>Game and capture text</span></div>
+ <div class="setting"><label for="gameLanguage">Game Language</label><select id="gameLanguage" style="width:100%"><option value="en">English</option><option value="bn">বাংলা</option><option value="es">Español</option><option value="fr">Français</option><option value="ar">العربية</option><option value="hi">हिन्दी</option><option value="pt">Português</option><option value="id">Bahasa Indonesia</option><option value="tr">Türkçe</option><option value="ur">اردو</option><option value="de">Deutsch</option><option value="it">Italiano</option><option value="ru">Русский</option><option value="zh">中文</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="ms">Bahasa Melayu</option><option value="sw">Kiswahili</option><option value="nl">Nederlands</option><option value="pl">Polski</option></select></div>
+ <div class="setting"><label for="captureLanguage">Capture View Language</label><select id="captureLanguage" style="width:100%"><option value="en">English</option><option value="bn">বাংলা</option><option value="es">Español</option><option value="fr">Français</option><option value="ar">العربية</option><option value="hi">हिन्दी</option><option value="pt">Português</option><option value="id">Bahasa Indonesia</option><option value="tr">Türkçe</option><option value="ur">اردو</option><option value="de">Deutsch</option><option value="it">Italiano</option><option value="ru">Русский</option><option value="zh">中文</option><option value="ja">日本語</option><option value="ko">한국어</option><option value="ms">Bahasa Melayu</option><option value="sw">Kiswahili</option><option value="nl">Nederlands</option><option value="pl">Polski</option></select></div>
+ <p class="note">Offline language pack: common interface labels are translated; country names remain in their standard names.</p>
+</section>
+<section class="settings">
+ <div class="setting"><label for="speed">Simulation Speed <output id="speedVal">1.0×</output></label><input id="speed" type="range" min=".4" max="2.4" value="1" step=".1"></div>
+ <div class="setting"><label for="limit">Ball Limit <output id="limitVal">180</output></label><input id="limit" type="range" min="40" max="300" value="180" step="20"></div>
+ <div class="setting"><label for="giant">Giant Ball Size <output id="giantVal">34</output></label><input id="giant" type="range" min="24" max="48" value="34" step="2"></div>
+ <div class="setting"><label for="giantSpeed">Giant Ball Speed <output id="giantSpeedVal">1.0×</output></label><input id="giantSpeed" type="range" min="0.3" max="3.0" value="1.0" step="0.1"></div>
+ <div class="setting"><label for="trail">Glow Trails <output id="trailVal">65%</output></label><input id="trail" type="range" min="0" max="100" value="65" step="5"></div>
+ <div class="setting"><label for="glow">Ball Glow <output id="glowVal">80%</output></label><input id="glow" type="range" min="0" max="150" value="80" step="10"></div>
+ <div class="setting"><label for="ballSize">Country Ball Size <output id="ballSizeVal">19</output></label><input id="ballSize" type="range" min="15" max="23" value="19" step="1"></div>
+ <div class="setting"><label for="mineCount">Mine Count <output id="mineCountVal">8</output></label><input id="mineCount" type="range" min="0" max="16" value="8" step="1"></div>
+ <div class="setting"><label for="mineSize">Mine Size <output id="mineSizeVal">17</output></label><input id="mineSize" type="range" min="9" max="30" value="17" step="1"></div>
+ <div class="setting"><label for="mineMotion">Mine Movement</label><select id="mineMotion"><option value="still">🧷 Stay in Place</option><option value="move">🏃 Move Around</option></select><small class="note">Mine Size changes each mine immediately. Choose whether mines stay fixed or move inside the arena.</small></div>
+ <div class="setting"><label for="musicStyle">Music Theme</label><select id="musicStyle" style="width:100%"><option value="arcade">⚡ Arcade Energy</option><option value="cinematic">🎬 Cinematic Pulse</option><option value="electronic">🌌 Electronic Drive</option><option value="calm">🌊 Calm Ambient</option><option value="epic">🏆 Epic Battle</option><option value="offbeat">🎮 Retro 8-bit</option></select></div>
+ <div class="setting"><label for="volume">Music Volume <output id="volumeVal">85%</output></label><input id="volume" type="range" min="0" max="100" value="85" step="5"></div>
+</section>
+<div class="mine-legend">💣 Country balls explode and disappear when they hit a mine. Change the mine count above.</div>
+<section class="countrybox" id="countryManager">
+ <div class="rowtitle"><strong>🌍 All Countries & Ball Setup</strong><span>Select a flag, set its ball count</span></div>
+ <div class="settings" style="padding:0;border:0;background:transparent;margin-bottom:10px">
+  <div class="setting"><label for="countrySelect">Choose Country to Add</label><select id="countrySelect" style="width:100%"></select></div>
+  <div class="setting"><label for="countryBallCount">Starting Balls for This Country</label><input id="countryBallCount" type="number" min="1" max="300" value="1" style="width:100%;padding:10px;border-radius:12px;background:#330505;color:#F8F5EC;border:1px solid #6f5734"></div>
+  <div class="setting"><label for="numberCountries">Number of Countries in Match <output id="numberCountriesVal">0 selected</output></label><input id="numberCountries" type="number" min="1" max="30" value="2" style="width:100%;padding:10px;border-radius:12px;background:#330505;color:#F8F5EC;border:1px solid #6f5734"><small class="note">Select countries below with ✅. Each checked country stays in your roster until you tap ❌.</small></div>
+ </div>
+ <div class="selected-countries" id="selectedCountries" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 12px"></div>
+ <div class="controls" style="grid-template-columns:1fr 1fr;margin-top:0">
+  <button class="primary" id="setCountryBalls">✅ Save Country Balls</button>
+  <button id="addCountryBalls">＋ Add Starting Balls</button>
+ </div>
+ <div class="countries" id="countries" style="max-height:270px;overflow:auto;padding:2px"></div>
+ <p class="note">Tap a country in the list to add it to your permanent match roster. ✅ means included; ❌ removes it. “Number of Countries in Match” controls how many selected countries enter the next/reset match.</p>
+</section>
+<p class="note">Rules: When the giant ball hits a country ball, another ball of that country appears. 💣 Mine hits make country balls explode and disappear. Change the mine count in Settings.</p>
+<section class="countrybox" style="margin-top:10px">
+ <div class="rowtitle"><strong>🎮 Winner Mode</strong><span>Choose how the battle runs</span></div>
+ <div class="settings" style="padding:0;border:0;background:transparent">
+  <div class="setting"><label for="mode">Battle Mode</label><select id="mode" style="width:100%"><option value="auto">Auto — Random Battle</option><option value="choose">Choose Winner</option></select></div>
+  <div class="setting"><label for="winner">Target Country</label><select id="winner" style="width:100%"></select></div>
+ </div>
+ <p class="note" style="margin-bottom:0">Auto: the giant ball hits countries naturally. Choose Winner: the giant ball actively aims at the selected country's nearest ball. The selected country gets repeated hit opportunities; mines and the ball limit can still affect the outcome.</p>
+</section>
+</div>
+<script>
+(() => {
+const canvas=document.getElementById('arena'), ctx=canvas.getContext('2d');
+const $=id=>document.getElementById(id);
+const W=720,H=720,CX=W/2,CY=H/2;
+const nations=[
+ {name:'Bangladesh',flag:'🇧🇩',code:'BD',color:'#24d17e'},
+ {name:'India',flag:'🇮🇳',code:'IN',color:'#ff9d38'},
+ {name:'Pakistan',flag:'🇵🇰',code:'PK',color:'#45d483'},
+ {name:'United States',flag:'🇺🇸',code:'US',color:'#ff5d72'},
+ {name:'Brazil',flag:'🇧🇷',code:'BR',color:'#f5d84a'},
+ {name:'Japan',flag:'🇯🇵',code:'JP',color:'#ff6b8c'},
+ {name:'Türkiye',flag:'🇹🇷',code:'TR',color:'#ff5366'},
+ {name:'Saudi Arabia',flag:'🇸🇦',code:'SA',color:'#4be0a0'},
+ {name:'Kalima Flag',flag:'🏴',code:'KL',color:'#d8e5f5'},
+ ...[{"name": "Afghanistan", "code": "AF"}, {"name": "Albania", "code": "AL"}, {"name": "Algeria", "code": "DZ"}, {"name": "American Samoa", "code": "AS"}, {"name": "Andorra", "code": "AD"}, {"name": "Angola", "code": "AO"}, {"name": "Anguilla", "code": "AI"}, {"name": "Antarctica", "code": "AQ"}, {"name": "Antigua and Barbuda", "code": "AG"}, {"name": "Argentina", "code": "AR"}, {"name": "Armenia", "code": "AM"}, {"name": "Aruba", "code": "AW"}, {"name": "Australia", "code": "AU"}, {"name": "Austria", "code": "AT"}, {"name": "Azerbaijan", "code": "AZ"}, {"name": "Bahamas", "code": "BS"}, {"name": "Bahrain", "code": "BH"}, {"name": "Barbados", "code": "BB"}, {"name": "Belarus", "code": "BY"}, {"name": "Belgium", "code": "BE"}, {"name": "Belize", "code": "BZ"}, {"name": "Benin", "code": "BJ"}, {"name": "Bermuda", "code": "BM"}, {"name": "Bhutan", "code": "BT"}, {"name": "Bolivia", "code": "BO"}, {"name": "Bonaire, Sint Eustatius and Saba", "code": "BQ"}, {"name": "Bosnia and Herzegovina", "code": "BA"}, {"name": "Botswana", "code": "BW"}, {"name": "Bouvet Island", "code": "BV"}, {"name": "British Indian Ocean Territory", "code": "IO"}, {"name": "Brunei", "code": "BN"}, {"name": "Bulgaria", "code": "BG"}, {"name": "Burkina Faso", "code": "BF"}, {"name": "Burundi", "code": "BI"}, {"name": "Cabo Verde", "code": "CV"}, {"name": "Cambodia", "code": "KH"}, {"name": "Cameroon", "code": "CM"}, {"name": "Canada", "code": "CA"}, {"name": "Cayman Islands", "code": "KY"}, {"name": "Central African Republic", "code": "CF"}, {"name": "Chad", "code": "TD"}, {"name": "Chile", "code": "CL"}, {"name": "China", "code": "CN"}, {"name": "Christmas Island", "code": "CX"}, {"name": "Cocos (Keeling) Islands", "code": "CC"}, {"name": "Colombia", "code": "CO"}, {"name": "Comoros", "code": "KM"}, {"name": "Republic of the Congo", "code": "CG"}, {"name": "DR Congo", "code": "CD"}, {"name": "Cook Islands", "code": "CK"}, {"name": "Costa Rica", "code": "CR"}, {"name": "Croatia", "code": "HR"}, {"name": "Cuba", "code": "CU"}, {"name": "Curaçao", "code": "CW"}, {"name": "Cyprus", "code": "CY"}, {"name": "Czechia", "code": "CZ"}, {"name": "Côte d'Ivoire", "code": "CI"}, {"name": "Denmark", "code": "DK"}, {"name": "Djibouti", "code": "DJ"}, {"name": "Dominica", "code": "DM"}, {"name": "Dominican Republic", "code": "DO"}, {"name": "Ecuador", "code": "EC"}, {"name": "Egypt", "code": "EG"}, {"name": "El Salvador", "code": "SV"}, {"name": "Equatorial Guinea", "code": "GQ"}, {"name": "Eritrea", "code": "ER"}, {"name": "Estonia", "code": "EE"}, {"name": "Eswatini", "code": "SZ"}, {"name": "Ethiopia", "code": "ET"}, {"name": "Falkland Islands (Malvinas)", "code": "FK"}, {"name": "Faroe Islands", "code": "FO"}, {"name": "Fiji", "code": "FJ"}, {"name": "Finland", "code": "FI"}, {"name": "France", "code": "FR"}, {"name": "French Guiana", "code": "GF"}, {"name": "French Polynesia", "code": "PF"}, {"name": "French Southern Territories", "code": "TF"}, {"name": "Gabon", "code": "GA"}, {"name": "Gambia", "code": "GM"}, {"name": "Georgia", "code": "GE"}, {"name": "Germany", "code": "DE"}, {"name": "Ghana", "code": "GH"}, {"name": "Gibraltar", "code": "GI"}, {"name": "Greece", "code": "GR"}, {"name": "Greenland", "code": "GL"}, {"name": "Grenada", "code": "GD"}, {"name": "Guadeloupe", "code": "GP"}, {"name": "Guam", "code": "GU"}, {"name": "Guatemala", "code": "GT"}, {"name": "Guernsey", "code": "GG"}, {"name": "Guinea", "code": "GN"}, {"name": "Guinea-Bissau", "code": "GW"}, {"name": "Guyana", "code": "GY"}, {"name": "Haiti", "code": "HT"}, {"name": "Heard Island and McDonald Islands", "code": "HM"}, {"name": "Holy See (Vatican City State)", "code": "VA"}, {"name": "Honduras", "code": "HN"}, {"name": "Hong Kong", "code": "HK"}, {"name": "Hungary", "code": "HU"}, {"name": "Iceland", "code": "IS"}, {"name": "Indonesia", "code": "ID"}, {"name": "Iran", "code": "IR"}, {"name": "Iraq", "code": "IQ"}, {"name": "Ireland", "code": "IE"}, {"name": "Isle of Man", "code": "IM"}, {"name": "Israel", "code": "IL"}, {"name": "Italy", "code": "IT"}, {"name": "Jamaica", "code": "JM"}, {"name": "Jersey", "code": "JE"}, {"name": "Jordan", "code": "JO"}, {"name": "Kazakhstan", "code": "KZ"}, {"name": "Kenya", "code": "KE"}, {"name": "Kiribati", "code": "KI"}, {"name": "North Korea", "code": "KP"}, {"name": "South Korea", "code": "KR"}, {"name": "Kuwait", "code": "KW"}, {"name": "Kyrgyzstan", "code": "KG"}, {"name": "Laos", "code": "LA"}, {"name": "Latvia", "code": "LV"}, {"name": "Lebanon", "code": "LB"}, {"name": "Lesotho", "code": "LS"}, {"name": "Liberia", "code": "LR"}, {"name": "Libya", "code": "LY"}, {"name": "Liechtenstein", "code": "LI"}, {"name": "Lithuania", "code": "LT"}, {"name": "Luxembourg", "code": "LU"}, {"name": "Macao", "code": "MO"}, {"name": "Madagascar", "code": "MG"}, {"name": "Malawi", "code": "MW"}, {"name": "Malaysia", "code": "MY"}, {"name": "Maldives", "code": "MV"}, {"name": "Mali", "code": "ML"}, {"name": "Malta", "code": "MT"}, {"name": "Marshall Islands", "code": "MH"}, {"name": "Martinique", "code": "MQ"}, {"name": "Mauritania", "code": "MR"}, {"name": "Mauritius", "code": "MU"}, {"name": "Mayotte", "code": "YT"}, {"name": "Mexico", "code": "MX"}, {"name": "Micronesia", "code": "FM"}, {"name": "Moldova", "code": "MD"}, {"name": "Monaco", "code": "MC"}, {"name": "Mongolia", "code": "MN"}, {"name": "Montenegro", "code": "ME"}, {"name": "Montserrat", "code": "MS"}, {"name": "Morocco", "code": "MA"}, {"name": "Mozambique", "code": "MZ"}, {"name": "Myanmar", "code": "MM"}, {"name": "Namibia", "code": "NA"}, {"name": "Nauru", "code": "NR"}, {"name": "Nepal", "code": "NP"}, {"name": "Netherlands", "code": "NL"}, {"name": "New Caledonia", "code": "NC"}, {"name": "New Zealand", "code": "NZ"}, {"name": "Nicaragua", "code": "NI"}, {"name": "Niger", "code": "NE"}, {"name": "Nigeria", "code": "NG"}, {"name": "Niue", "code": "NU"}, {"name": "Norfolk Island", "code": "NF"}, {"name": "North Macedonia", "code": "MK"}, {"name": "Northern Mariana Islands", "code": "MP"}, {"name": "Norway", "code": "NO"}, {"name": "Oman", "code": "OM"}, {"name": "Palau", "code": "PW"}, {"name": "Palestine", "code": "PS"}, {"name": "Panama", "code": "PA"}, {"name": "Papua New Guinea", "code": "PG"}, {"name": "Paraguay", "code": "PY"}, {"name": "Peru", "code": "PE"}, {"name": "Philippines", "code": "PH"}, {"name": "Pitcairn", "code": "PN"}, {"name": "Poland", "code": "PL"}, {"name": "Portugal", "code": "PT"}, {"name": "Puerto Rico", "code": "PR"}, {"name": "Qatar", "code": "QA"}, {"name": "Romania", "code": "RO"}, {"name": "Russia", "code": "RU"}, {"name": "Rwanda", "code": "RW"}, {"name": "Réunion", "code": "RE"}, {"name": "Saint Barthélemy", "code": "BL"}, {"name": "Saint Helena, Ascension and Tristan da Cunha", "code": "SH"}, {"name": "Saint Kitts and Nevis", "code": "KN"}, {"name": "Saint Lucia", "code": "LC"}, {"name": "Saint Martin (French part)", "code": "MF"}, {"name": "Saint Pierre and Miquelon", "code": "PM"}, {"name": "Saint Vincent and the Grenadines", "code": "VC"}, {"name": "Samoa", "code": "WS"}, {"name": "San Marino", "code": "SM"}, {"name": "Sao Tome and Principe", "code": "ST"}, {"name": "Senegal", "code": "SN"}, {"name": "Serbia", "code": "RS"}, {"name": "Seychelles", "code": "SC"}, {"name": "Sierra Leone", "code": "SL"}, {"name": "Singapore", "code": "SG"}, {"name": "Sint Maarten (Dutch part)", "code": "SX"}, {"name": "Slovakia", "code": "SK"}, {"name": "Slovenia", "code": "SI"}, {"name": "Solomon Islands", "code": "SB"}, {"name": "Somalia", "code": "SO"}, {"name": "South Africa", "code": "ZA"}, {"name": "South Georgia and the South Sandwich Islands", "code": "GS"}, {"name": "South Sudan", "code": "SS"}, {"name": "Spain", "code": "ES"}, {"name": "Sri Lanka", "code": "LK"}, {"name": "Sudan", "code": "SD"}, {"name": "Suriname", "code": "SR"}, {"name": "Svalbard and Jan Mayen", "code": "SJ"}, {"name": "Sweden", "code": "SE"}, {"name": "Switzerland", "code": "CH"}, {"name": "Syria", "code": "SY"}, {"name": "Taiwan", "code": "TW"}, {"name": "Tajikistan", "code": "TJ"}, {"name": "Tanzania", "code": "TZ"}, {"name": "Thailand", "code": "TH"}, {"name": "Timor-Leste", "code": "TL"}, {"name": "Togo", "code": "TG"}, {"name": "Tokelau", "code": "TK"}, {"name": "Tonga", "code": "TO"}, {"name": "Trinidad and Tobago", "code": "TT"}, {"name": "Tunisia", "code": "TN"}, {"name": "Turkmenistan", "code": "TM"}, {"name": "Turks and Caicos Islands", "code": "TC"}, {"name": "Tuvalu", "code": "TV"}, {"name": "Uganda", "code": "UG"}, {"name": "Ukraine", "code": "UA"}, {"name": "United Arab Emirates", "code": "AE"}, {"name": "United Kingdom", "code": "GB"}, {"name": "United States Minor Outlying Islands", "code": "UM"}, {"name": "Uruguay", "code": "UY"}, {"name": "Uzbekistan", "code": "UZ"}, {"name": "Vanuatu", "code": "VU"}, {"name": "Venezuela", "code": "VE"}, {"name": "Vietnam", "code": "VN"}, {"name": "Virgin Islands, British", "code": "VG"}, {"name": "Virgin Islands, U.S.", "code": "VI"}, {"name": "Wallis and Futuna", "code": "WF"}, {"name": "Western Sahara", "code": "EH"}, {"name": "Yemen", "code": "YE"}, {"name": "Zambia", "code": "ZM"}, {"name": "Zimbabwe", "code": "ZW"}, {"name": "Åland Islands", "code": "AX"}].map((c,i)=>({...c,flag:flagFromCode(c.code),color:countryColor(i)}))
+];
+function flagFromCode(code){if(!code||code.length!==2)return '🏳️';return String.fromCodePoint(...[...code.toUpperCase()].map(ch=>127397+ch.charCodeAt(0)))}
+function countryColor(i){const palette=['#4bd6a2','#ffad52','#67b9ff','#ff668e','#f0d35b','#bd91ff','#53e1e9','#ff8f70'];return palette[i%palette.length]}
+function fillWinnerOptions(){$('winner').innerHTML=nations.map((n,i)=>`<option value="${i}">${n.flag} ${n.name}</option>`).join('')}
+fillWinnerOptions();
+$('countrySelect').innerHTML=nations.map((n,i)=>`<option value="${i}">${n.flag} ${n.name}</option>`).join('');
+let balls=[],giant=null,running=false,raf=0,last=0,hits=0,slow=false,flash=0,spawnCount=0,mines=[],particles=[],lastStats=0;
+let targetLock=0;
+let musicOn=false,audioCtx=null,musicTimer=null,musicStep=0,musicMaster=null;
+let selectedCountries=new Set([0,1,2,3,4,5,6,7]);try{const saved=JSON.parse(localStorage.getItem('flagClashSelectedCountries')||'null');if(Array.isArray(saved)&&saved.length)selectedCountries=new Set(saved.filter(i=>Number.isInteger(i)&&i>=0&&i<nations.length));}catch(e){}
+function saveSelectedCountries(){try{localStorage.setItem('flagClashSelectedCountries',JSON.stringify([...selectedCountries]));}catch(e){}}
+function startMusic(){
+ try{
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC){showToast('Music not supported','Audio is not available in this browser');return}
+  if(!audioCtx)audioCtx=new AC();
+  if(audioCtx.state==='suspended')audioCtx.resume();
+  if(!musicMaster){musicMaster=audioCtx.createGain();musicMaster.gain.value=get('volume')/100;musicMaster.connect(audioCtx.destination)}
+  musicMaster.gain.setTargetAtTime(get('volume')/100,audioCtx.currentTime,.05);
+  musicOn=true;$('music').textContent='♫ Music On';$('music').classList.add('primary');
+  stopMusicTimerOnly();
+  // Original, upbeat arcade-style melody generated locally; no audio file or internet required.
+  const themes={arcade:{melody:[523,659,784,659,587,698,880,698,523,659,784,988,880,784,659,587],bass:[131,131,165,165,175,175,147,147],type:'triangle',step:250},cinematic:{melody:[392,440,523,392,349,392,466,523,392,523,587,659,587,523,440,392],bass:[98,110,131,98,87,110,117,98],type:'sawtooth',step:360},electronic:{melody:[440,554,659,880,659,554,740,988,880,740,659,554,440,554,740,880],bass:[110,110,138,138,165,165,138,138],type:'square',step:190},calm:{melody:[392,494,587,494,440,523,659,523,349,440,523,440,392,494,587,494],bass:[98,98,123,123,110,110,87,87],type:'sine',step:430},epic:{melody:[196,262,392,523,392,523,659,784,587,784,988,784,659,523,392,262],bass:[65,65,98,98,87,87,73,73],type:'triangle',step:310},offbeat:{melody:[659,0,659,784,0,523,659,0,392,523,0,587,494,0,440,392],bass:[131,0,131,196,0,147,110,0],type:'square',step:170}};
+  const theme=themes[$('musicStyle')?.value||'arcade']||themes.arcade;const melody=theme.melody;const bass=theme.bass;
+  musicTimer=setInterval(()=>{
+   if(!musicOn||!audioCtx||!musicMaster)return;
+   const now=audioCtx.currentTime, idx=musicStep++;
+   const freq=melody[idx%melody.length], low=bass[Math.floor(idx/2)%bass.length]; if(!freq)return;
+   const tone=(f,type,vol,dur,detune=0)=>{
+    const osc=audioCtx.createOscillator(),g=audioCtx.createGain();
+    osc.type=type;osc.frequency.setValueAtTime(f,now);osc.detune.value=detune;
+    g.gain.setValueAtTime(.0001,now);g.gain.exponentialRampToValueAtTime(vol,now+.018);g.gain.exponentialRampToValueAtTime(.0001,now+dur);
+    osc.connect(g);g.connect(musicMaster);osc.start(now);osc.stop(now+dur+.03);
+   };
+   tone(freq,theme.type,.22,.22);
+   if(idx%2===0)tone(low,'sine',.20,.34,-3);
+   // Soft plucky high note on alternating beats
+   if(idx%4===0)tone(freq*2,'sine',.065,.12,2);
+  },theme.step);
+ }catch(e){showToast('Music did not start','Tap the Music button again')}
+}
+function stopMusicTimerOnly(){if(musicTimer){clearInterval(musicTimer);musicTimer=null}}
+function stopMusic(){musicOn=false;stopMusicTimerOnly();$('music').textContent='♫ Music Off';$('music').classList.remove('primary')}
+$('musicStyle').addEventListener('change',()=>{if(musicOn){stopMusic();startMusic()}});
+
+const get=(id)=>Number($(id).value);
+function rand(a,b){return a+Math.random()*(b-a)}
+function spawn(i,x,y,boost=false){
+ if(balls.length>=get('limit')) return;
+ const n=nations[i],r=boost?get('ballSize'):get('ballSize')*rand(.88,1.02);
+ let a=rand(0,Math.PI*2),s=rand(1.2,2.6);
+ balls.push({x:x??rand(90,630),y:y??rand(90,630),vx:Math.cos(a)*s,vy:Math.sin(a)*s,r,ni:i,phase:rand(0,6.28),id:Math.random()});
+}
+function reset(){
+ balls=[];hits=0;spawnCount=0;flash=0;particles=[];mines=[];
+ const roster=[...selectedCountries].filter(i=>i>=0&&i<nations.length);const wanted=Math.max(1,Math.min(30,Number($('numberCountries')?.value)||roster.length||2));const matchCountries=roster.slice(0,wanted);if(!matchCountries.length){matchCountries.push(0,1);selectedCountries.add(0);selectedCountries.add(1)}for(const i of matchCountries)spawn(i,CX+rand(-205,205),CY+rand(-205,205),true);renderSelectedCountries();
+ placeMines();
+ giant={x:CX+25,y:CY-10,vx:2.3,vy:1.7,r:get('giant')};
+ updateStats();draw();showToast('🌍 FLAG CLASH','Giant ball hit = +1 country ball',1800);
+}
+function placeMines(){
+ mines=[];
+ const count=get('mineCount');
+ for(let i=0;i<count;i++){
+  const a=(Math.PI*2*i/count)+rand(-.15,.15),rad=rand(95,265);
+  mines.push({x:CX+Math.cos(a)*rad,y:CY+Math.sin(a)*rad,baseX:CX+Math.cos(a)*rad,baseY:CY+Math.sin(a)*rad,r:get('mineSize'),phase:rand(0,6.28),vx:rand(-1.2,1.2),vy:rand(-1.2,1.2)});
+ }
+}
+function explode(x,y,color){
+ flash=Math.max(flash,.13);
+ for(let i=0;i<18;i++){
+  const a=Math.PI*2*i/18+rand(-.18,.18),s=rand(1.5,5.2);
+  particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(18,32),max:32,color});
+ }
+}
+function showToast(title,sub,ms=1000){$('toast').innerHTML='<strong>'+title+'</strong><small>'+sub+'</small>';$('toast').style.opacity='1';clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>$('toast').style.opacity='0',ms)}
+function updateStats(){
+ $('total').textContent=balls.length;$('hits').textContent=hits;
+ const counts=nations.map((n,i)=>balls.filter(b=>b.ni===i).length),max=Math.max(...counts);
+ const leaderIndex=counts.indexOf(max);
+ $('leader').textContent=nations[leaderIndex]?.flag||'—';
+ $('captureLeader').textContent=(nations[leaderIndex]?.flag||'—')+' '+(nations[leaderIndex]?.name||'');
+ $('captureHits').textContent=hits;$('captureTotal').textContent=balls.length;
+ $('captureCountryList').innerHTML=counts.map((count,i)=>({count,i,n:nations[i]})).filter(x=>x.count>0).sort((a,b)=>b.count-a.count).slice(0,8).map(x=>`<div class="mini-country"><span class="mini-flag">${x.n.flag}</span><span class="mini-name">${x.n.name}</span><span class="mini-count">${x.count}</span></div>`).join('') || '<div class="mini-country">No country balls</div>';
+ $('countries').innerHTML=nations.map((n,i)=>`<button type="button" class="country country-pick" data-country="${i}" title="Select ${n.name}"><span class="flag">${n.flag}</span><span>${n.name}</span><b>${counts[i]}</b></button>`).join('');
+}
+function circle(x,y,r,fill,stroke=null,lw=1){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.lineWidth=lw;ctx.strokeStyle=stroke;ctx.stroke()}}
+function drawFlag(ni,x,y,size){
+ const w=size*1.65,h=size*1.08, l=x-w/2,t=y-h/2;
+ const rr=(x,y,w,h,r)=>{if(ctx.roundRect){ctx.roundRect(x,y,w,h,r)}else{ctx.rect(x,y,w,h)}};
+ ctx.save();ctx.beginPath();rr(l,t,w,h,2);ctx.clip();
+ // Draw recognizable flag artwork directly; avoids missing flag emoji on some Android phones.
+ if(ni===0){ctx.fillStyle='#006a4e';ctx.fillRect(l,t,w,h);ctx.fillStyle='#f42a41';circle(x,y,size*.29,'#f42a41')}
+ if(ni===1){ctx.fillStyle='#ff9933';ctx.fillRect(l,t,w,h/3);ctx.fillStyle='#fff';ctx.fillRect(l,t+h/3,w,h/3);ctx.fillStyle='#138808';ctx.fillRect(l,t+2*h/3,w,h/3);circle(x,y,size*.17,'#000080');circle(x,y,size*.13,'#fff')}
+ if(ni===2){ctx.fillStyle='#01411c';ctx.fillRect(l,t,w,h);ctx.fillStyle='#fff';ctx.fillRect(l,t,w*.28,h);ctx.fillStyle='#fff';circle(x+w*.58,y,size*.26,'#fff');circle(x+w*.64,y-size*.04,size*.22,'#01411c')}
+ if(ni===3){ctx.fillStyle='#fff';ctx.fillRect(l,t,w,h);for(let k=0;k<7;k++){ctx.fillStyle='#c9253d';ctx.fillRect(l,t+k*h/7,w,h/14)}ctx.fillStyle='#244477';ctx.fillRect(l,t,w*.48,h*.55);for(let k=0;k<3;k++)for(let j=0;j<4;j++){circle(l+w*.07+j*w*.095,t+h*.09+k*h*.15,size*.025,'#fff')}}
+ if(ni===4){ctx.fillStyle='#009b3a';ctx.fillRect(l,t,w,h);ctx.beginPath();ctx.moveTo(x,t+h*.12);ctx.lineTo(l+w*.88,y);ctx.lineTo(x,t+h*.88);ctx.lineTo(l+w*.12,y);ctx.closePath();ctx.fillStyle='#ffdf00';ctx.fill();circle(x,y,size*.22,'#002776')}
+ if(ni===5){ctx.fillStyle='#fff';ctx.fillRect(l,t,w,h);circle(x,y,size*.31,'#bc002d')}
+ if(ni===6){ctx.fillStyle='#e30a17';ctx.fillRect(l,t,w,h);circle(x-size*.05,y,size*.29,'#fff');circle(x+size*.04,y-size*.04,size*.23,'#e30a17');const sx=x+size*.37,sy=y,outer=size*.15,inner=size*.06;ctx.beginPath();for(let k=0;k<10;k++){let a=-Math.PI/2+k*Math.PI/5,r=k%2?inner:outer;ctx.lineTo(sx+Math.cos(a)*r,sy+Math.sin(a)*r)}ctx.closePath();ctx.fillStyle='#fff';ctx.fill()}
+ if(ni===7){
+  // Saudi flag: green field, clearly rendered Arabic shahada and sword.
+  ctx.fillStyle='#006c35';ctx.fillRect(l,t,w,h);
+  ctx.save();ctx.direction='rtl';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillStyle='#fff';ctx.font=`bold ${Math.max(7,size*.43)}px serif`;
+  ctx.fillText('لا إله إلا الله',x,y-size*.12,w*.88);
+  ctx.font=`bold ${Math.max(5,size*.25)}px serif`;
+  ctx.fillText('محمد رسول الله',x,y+size*.12,w*.82);
+  ctx.strokeStyle='#fff';ctx.lineWidth=Math.max(1,size*.045);ctx.beginPath();ctx.moveTo(l+w*.23,y+size*.31);ctx.lineTo(l+w*.77,y+size*.31);ctx.stroke();
+  ctx.restore();
+ }
+ if(ni===8){
+  // Kalima banner ball: black field with legible white shahada.
+  ctx.fillStyle='#05070b';ctx.fillRect(l,t,w,h);
+  ctx.save();ctx.direction='rtl';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillStyle='#fff';ctx.font=`bold ${Math.max(7,size*.42)}px serif`;
+  ctx.fillText('لا إله إلا الله',x,y-size*.12,w*.92);
+  ctx.font=`bold ${Math.max(5,size*.25)}px serif`;
+  ctx.fillText('محمد رسول الله',x,y+size*.12,w*.88);
+  ctx.restore();
+ }
+ ctx.restore();ctx.strokeStyle='#ffffffcc';ctx.lineWidth=1;ctx.beginPath();rr(l,t,w,h,2);ctx.stroke();
+}
+function drawBall(b){
+ const n=nations[b.ni];
+ ctx.save();ctx.shadowColor=n.color;ctx.shadowBlur=get('glow')*.22;
+ circle(b.x,b.y,b.r,n.color+'44',n.color,2.5);
+ ctx.shadowBlur=0;
+ if(b.ni<9)drawFlag(b.ni,b.x,b.y,b.r*1.48);else{
+  // Android's emoji flag glyphs are rendered larger on a high-contrast flag badge.
+  const fw=b.r*2.05,fh=b.r*1.42;
+  ctx.save();ctx.shadowColor='#000';ctx.shadowBlur=5;
+  ctx.beginPath();ctx.roundRect?ctx.roundRect(b.x-fw/2,b.y-fh/2,fw,fh,4):ctx.rect(b.x-fw/2,b.y-fh/2,fw,fh);
+  ctx.fillStyle='#f8fbff';ctx.fill();ctx.lineWidth=1.8;ctx.strokeStyle='#ffffff';ctx.stroke();ctx.shadowBlur=0;
+  ctx.font=`${Math.round(b.r*2.05)}px "Noto Color Emoji","Apple Color Emoji","Segoe UI Emoji",sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(n.flag,b.x,b.y+1);ctx.restore();
+ }
+ ctx.restore();
+}
+function draw(){
+ ctx.clearRect(0,0,W,H);
+ const bg=ctx.createRadialGradient(CX,CY,20,CX,CY,520);bg.addColorStop(0,'#5b2920');bg.addColorStop(1,'#330505');ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+ ctx.save();ctx.strokeStyle='#6f5734';ctx.lineWidth=1;
+ for(let r=70;r<370;r+=70){ctx.beginPath();ctx.arc(CX,CY,r,0,Math.PI*2);ctx.stroke()}
+ for(let x=0;x<W;x+=36)for(let y=0;y<H;y+=36){ctx.fillStyle='#B0A06A12';ctx.fillRect(x,y,2,2)}
+ ctx.restore();
+ // Arena boundary
+ ctx.beginPath();ctx.arc(CX,CY,335,0,Math.PI*2);ctx.strokeStyle='#B0A06A';ctx.lineWidth=4;ctx.stroke();
+ // gentle trails
+ const trail=get('trail')/100;
+ balls.forEach(b=>{if(trail>.05){ctx.globalAlpha=trail*.23;ctx.strokeStyle=nations[b.ni].color;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.lineTo(b.x-b.vx*5,b.y-b.vy*5);ctx.stroke();ctx.globalAlpha=1}drawBall(b)});
+ // Mines are fixed hazards; bright rings and a clear bomb symbol make them easy to spot.
+ mines.forEach(m=>{
+  m.r=get('mineSize');
+  if($('mineMotion').value==='move'){m.x+=m.vx*speed*dt;m.y+=m.vy*speed*dt;const mdx=m.x-CX,mdy=m.y-CY,md=Math.hypot(mdx,mdy);if(md>305){m.vx-=2*(m.vx*mdx+m.vy*mdy)/(md*md||1)*mdx;m.vy-=2*(m.vx*mdx+m.vy*mdy)/(md*md||1)*mdy;}}
+  const pulse=1+Math.sin(performance.now()/180+m.phase)*.08;
+  ctx.save();ctx.shadowColor='#A26B4A';ctx.shadowBlur=18;
+  circle(m.x,m.y,m.r*pulse,'#330505','#A26B4A',3);
+  ctx.shadowBlur=0;ctx.font='bold 22px system-ui, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('💣',m.x,m.y+1);
+  ctx.restore();
+ });
+ particles=particles.filter(p=>p.life>0);
+ for(const p of particles){
+  ctx.globalAlpha=Math.max(0,p.life/p.max);ctx.fillStyle=p.color;circle(p.x,p.y,Math.max(1,4*p.life/p.max),p.color);
+  p.x+=p.vx;p.y+=p.vy;p.vx*=.96;p.vy*=.96;p.life--;
+ }
+ ctx.globalAlpha=1;
+ if(giant){
+  const r=get('giant');giant.r=r;
+  const pulse=1+Math.sin(performance.now()/180)*.04;
+  ctx.save();ctx.shadowColor='#B0A06A';ctx.shadowBlur=32;
+  circle(giant.x,giant.y,r*pulse,'#6f5734','#B0A06A',4);
+  ctx.shadowBlur=0;circle(giant.x-r*.27,giant.y-r*.25,r*.19,'#F8F5EC88');
+  ctx.font=`bold ${Math.round(r*.83)}px system-ui`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#F8F5EC';ctx.fillText('×2',giant.x,giant.y+1);
+  ctx.restore();
+ }
+ if(flash>0){ctx.fillStyle=`rgba(93,239,255,${flash})`;ctx.fillRect(0,0,W,H);flash*=.72}
+}
+function collide(){
+ const bound=335;
+ for(const b of balls){
+  let dx=b.x-CX,dy=b.y-CY,d=Math.hypot(dx,dy),max=bound-b.r;
+  if(d>max){const nx=dx/d,ny=dy/d;b.x=CX+nx*max;b.y=CY+ny*max;const dot=b.vx*nx+b.vy*ny;if(dot>0){b.vx-=2*dot*nx;b.vy-=2*dot*ny}}
+  // ball-to-ball collision
+ }
+ // elastic-ish ball collisions, capped work via moderate limit
+ for(let i=0;i<balls.length;i++)for(let j=i+1;j<balls.length;j++){
+  const a=balls[i],b=balls[j],dx=b.x-a.x,dy=b.y-a.y,dist=Math.hypot(dx,dy),min=a.r+b.r;
+  if(dist>0&&dist<min){const nx=dx/dist,ny=dy/dist,over=(min-dist)/2;a.x-=nx*over;a.y-=ny*over;b.x+=nx*over;b.y+=ny*over;const rel=(b.vx-a.vx)*nx+(b.vy-a.vy)*ny;if(rel<0){a.vx+=rel*nx;a.vy+=rel*ny;b.vx-=rel*nx;b.vy-=rel*ny}}
+ }
+ // A country ball touching a mine explodes and disappears.
+ for(let i=balls.length-1;i>=0;i--){
+  const b=balls[i];
+  let mined=false;
+  for(const m of mines){
+   const d=Math.hypot(b.x-m.x,b.y-m.y);
+   if(d < b.r+m.r*.72){explode(b.x,b.y,nations[b.ni].color);balls.splice(i,1);mined=true;break}
+  }
+  if(mined)continue;
+ }
+ // giant ball collision with flag balls: double the touched country's ball
+ for(const b of balls){
+  const dx=b.x-giant.x,dy=b.y-giant.y,d=Math.hypot(dx,dy),min=b.r+giant.r;
+  if(d<min&&d>0){
+   const nx=dx/d,ny=dy/d;b.x=giant.x+nx*(min+1);b.y=giant.y+ny*(min+1);
+   const dot=(b.vx-giant.vx)*nx+(b.vy-giant.vy)*ny;
+   if(dot<0){b.vx-=dot*nx*1.6;b.vy-=dot*ny*1.6;giant.vx+=dot*nx*.12;giant.vy+=dot*ny*.12}
+   if(!b.hitLock){b.hitLock=30;hits++;flash=.18;if(!showToast.lastHit||performance.now()-showToast.lastHit>650){showToast(nations[b.ni].name+' ×2','A new country ball spawned!');showToast.lastHit=performance.now();}if(balls.length<get('limit'))spawn(b.ni,b.x+nx*18+rand(-5,5),b.y+ny*18+rand(-5,5),true);b.vx+=nx*1.8;b.vy+=ny*1.8}
+  }
+  if(b.hitLock>0)b.hitLock--;
+ }
+}
+function frame(t){
+ if(!running)return;
+ const dt=Math.min(2,(t-last)/16.67||1);last=t;
+ const speed=get('speed')*(slow?.35:1);
+ for(const b of balls){b.x+=b.vx*speed*dt;b.y+=b.vy*speed*dt;b.phase+=.02*dt}
+ // In Choose Winner mode, steer the giant ball toward the selected country's nearest ball.
+ if($('mode').value==='choose'){
+  const chosen=Number($('winner').value);
+  let target=null,nearest=Infinity;
+  for(const b of balls){if(b.ni===chosen){const d=Math.hypot(b.x-giant.x,b.y-giant.y);if(d<nearest){nearest=d;target=b}}}
+  if(!target && balls.length<get('limit')){spawn(chosen,CX+rand(-140,140),CY+rand(-140,140),true);target=balls[balls.length-1]}
+  if(target){const dx=target.x-giant.x,dy=target.y-giant.y,d=Math.hypot(dx,dy)||1;const desired=4.4;giant.vx=(dx/d)*desired;giant.vy=(dy/d)*desired;}
+ }
+ const giantMoveSpeed=speed*get('giantSpeed');
+ giant.x+=giant.vx*giantMoveSpeed*dt;giant.y+=giant.vy*giantMoveSpeed*dt;
+ const dx=giant.x-CX,dy=giant.y-CY,d=Math.hypot(dx,dy),max=335-giant.r;
+ if(d>max){const nx=dx/d,ny=dy/d;giant.x=CX+nx*max;giant.y=CY+ny*max;const dot=giant.vx*nx+giant.vy*ny;giant.vx-=2*dot*nx;giant.vy-=2*dot*ny}
+ collide();draw();
+ if(t%8<2)updateStats();
+ raf=requestAnimationFrame(frame);
+}
+function play(){running=!running;$('play').textContent=running?'Ⅱ Pause':'▶ Play';if(running){last=performance.now();raf=requestAnimationFrame(frame)}else cancelAnimationFrame(raf)}
+$('mode').addEventListener('change',()=>{showToast($('mode').value==='auto'?'AUTO MODE':'WINNER MODE',$('mode').value==='auto'?'Countries compete naturally.':'Giant ball targets '+nations[Number($('winner').value)].name+'.',1400)});
+$('winner').addEventListener('change',()=>{if($('mode').value==='choose')showToast('TARGET SELECTED',nations[Number($('winner').value)].name+' will be targeted.',1200)});
+$('countrySelect').addEventListener('change',()=>{const i=Number($('countrySelect').value);$('winner').value=String(i);$('countryBallCount').value=Math.max(0,balls.filter(b=>b.ni===i).length);});
+$('winner').addEventListener('change',()=>{if($('countrySelect')){$('countrySelect').value=$('winner').value;}});
+function renderSelectedCountries(){const host=$('selectedCountries');if(!host)return;host.innerHTML=[...selectedCountries].sort((a,b)=>a-b).map(i=>`<button type="button" data-remove-country="${i}"><span class="check">✅</span> ${nations[i].flag} ${nations[i].name} <span class="remove">❌</span></button>`).join('')||'<small class="note">No countries selected yet. Choose one from the list below.</small>';const out=$('numberCountriesVal');if(out)out.textContent=selectedCountries.size+' selected';const inp=$('numberCountries');if(inp)inp.max=Math.max(1,selectedCountries.size);}
+$('countries').addEventListener('click',e=>{const remove=e.target.closest('[data-remove-country]');if(remove){const i=Number(remove.dataset.removeCountry);selectedCountries.delete(i);saveSelectedCountries();renderSelectedCountries();return}const btn=e.target.closest('[data-country]');if(!btn)return;const i=Number(btn.dataset.country);$('countrySelect').value=String(i);$('winner').value=String(i);if(selectedCountries.has(i))selectedCountries.delete(i);else selectedCountries.add(i);saveSelectedCountries();$('countryBallCount').value=Math.max(1,balls.filter(b=>b.ni===i).length||1);renderSelectedCountries();});
+$('selectedCountries').addEventListener('click',e=>{const btn=e.target.closest('[data-remove-country]');if(!btn)return;selectedCountries.delete(Number(btn.dataset.removeCountry));saveSelectedCountries();renderSelectedCountries()});
+$('numberCountries').addEventListener('change',()=>{let n=Math.max(1,Math.min(selectedCountries.size||1,Math.floor(Number($('numberCountries').value)||1)));$('numberCountries').value=n;renderSelectedCountries()});
+$('setCountryBalls').addEventListener('click',()=>{const i=Number($('countrySelect').value);selectedCountries.add(i);saveSelectedCountries();renderSelectedCountries();const n=Math.max(1,Math.min(get('limit'),Math.floor(Number($('countryBallCount').value)||1))); const other=balls.filter(b=>b.ni!==i);balls=other;const allowed=Math.max(0,get('limit')-balls.length),toAdd=Math.min(n,allowed);for(let k=0;k<toAdd;k++)spawn(i,CX+rand(-205,205),CY+rand(-205,205),true);updateStats();draw();showToast('COUNTRY COUNT SET',nations[i].name+': '+toAdd+' balls',1400);});
+$('addCountryBalls').addEventListener('click',()=>{const i=Number($('countrySelect').value);selectedCountries.add(i);saveSelectedCountries();renderSelectedCountries();const n=Math.max(1,Math.floor(Number($('countryBallCount').value)||1)),allowed=Math.max(0,get('limit')-balls.length),toAdd=Math.min(n,allowed);for(let k=0;k<toAdd;k++)spawn(i,CX+rand(-205,205),CY+rand(-205,205),true);updateStats();draw();showToast('BALLS ADDED',nations[i].name+': +'+toAdd,1200);});
+$('play').addEventListener('click',play);
+$('music').addEventListener('click',()=>{if(musicOn)stopMusic();else startMusic()});
+$('add').addEventListener('click',()=>{for(let i=0;i<5;i++)spawn(Math.floor(Math.random()*nations.length));updateStats();draw()});
+$('slow').addEventListener('click',()=>{slow=!slow;$('slow').textContent=slow?'▶ Normal Speed':'🐢 Slow-Mo';$('slow').classList.toggle('primary',slow)});
+$('reset').addEventListener('click',()=>{const was=running;if(was){running=false;cancelAnimationFrame(raf)}reset();if(was)play()});
+['speed','limit','giant','giantSpeed','trail','glow','ballSize','mineCount','mineSize','volume'].forEach(id=>$(id).addEventListener('input',()=>{
+ const labels={speed:get('speed').toFixed(1)+'×',giantSpeed:get('giantSpeed').toFixed(1)+'×',trail:get('trail')+'%',glow:get('glow')+'%',ballSize:get('ballSize'),mineCount:get('mineCount'),volume:get('volume')+'%',limit:get('limit'),giant:get('giant')};
+ $(id+'Val').textContent=labels[id];
+ if(id==='limit'&&balls.length>get(id))balls.length=get(id);
+ if(id==='giant'&&giant)giant.r=get(id);
+ if(id==='mineCount'){placeMines()}if(id==='mineSize'){mines.forEach(m=>m.r=get('mineSize'))}
+ if(id==='ballSize'){for(const b of balls)b.r=get('ballSize')*0.95}
+ if(id==='volume'&&musicMaster&&audioCtx)musicMaster.gain.setTargetAtTime(get('volume')/100,audioCtx.currentTime,.05);
+ draw();updateStats();
+}));
+const translations={
+ en:{lead:'LEADING COUNTRY',hits:'GIANT BALL HITS',total:'TOTAL BALLS',countries:'COUNTRY BALLS',exit:'Exit Capture',refresh:'↻ Refresh'},
+ bn:{lead:'এগিয়ে থাকা দেশ',hits:'জায়ান্ট বলের আঘাত',total:'মোট বল',countries:'দেশের বল',exit:'ক্যাপচার বন্ধ',refresh:'↻ আবার শুরু'},
+ es:{lead:'PAÍS LÍDER',hits:'GOLPES DE LA BOLA GIGANTE',total:'BOLAS TOTALES',countries:'BOLAS POR PAÍS',exit:'Salir de captura',refresh:'↻ Reiniciar'},
+ fr:{lead:'PAYS EN TÊTE',hits:'COUPS DE LA BALLE GÉANTE',total:'TOTAL DES BALLES',countries:'BALLES PAR PAYS',exit:'Quitter capture',refresh:'↻ Recommencer'},
+ ar:{lead:'الدولة المتصدرة',hits:'ضربات الكرة العملاقة',total:'إجمالي الكرات',countries:'كرات الدول',exit:'إنهاء العرض',refresh:'↻ إعادة'},
+ hi:{lead:'आगे चल रहा देश',hits:'जायंट बॉल के हिट',total:'कुल गेंदें',countries:'देश की गेंदें',exit:'बाहर जाएँ',refresh:'↻ रीसेट'},
+ pt:{lead:'PAÍS LÍDER',hits:'GOLPES DA BOLA GIGANTE',total:'TOTAL DE BOLAS',countries:'BOLAS POR PAÍS',exit:'Sair da captura',refresh:'↻ Reiniciar'},
+ id:{lead:'NEGARA TERDEPAN',hits:'HANTAMAN BOLA BESAR',total:'TOTAL BOLA',countries:'BOLA PER NEGARA',exit:'Keluar Capture',refresh:'↻ Ulang'},
+ tr:{lead:'LİDER ÜLKE',hits:'DEV TOP VURUŞLARI',total:'TOPLAM TOP',countries:'ÜLKE TOPLARI',exit:'Çıkış',refresh:'↻ Yenile'},
+ ur:{lead:'سب سے آگے ملک',hits:'جائنٹ بال کے ہٹ',total:'کل گیندیں',countries:'ملک کی گیندیں',exit:'باہر نکلیں',refresh:'↻ دوبارہ'},
+ de:{lead:'FÜHRENDES LAND',hits:'TREFFER DES RIESENBALLS',total:'BÄLLE GESAMT',countries:'BÄLLE PRO LAND',exit:'Ansicht verlassen',refresh:'↻ Neustart'},
+ it:{lead:'PAESE IN TESTA',hits:'COLPI DELLA PALLA GIGANTE',total:'PALLINE TOTALI',countries:'PALLINE PER PAESE',exit:'Esci dalla vista',refresh:'↻ Riavvia'},
+ ru:{lead:'ЛИДИРУЮЩАЯ СТРАНА',hits:'УДАРЫ ГИГАНТСКОГО ШАРА',total:'ВСЕГО ШАРОВ',countries:'ШАРЫ СТРАН',exit:'Выйти',refresh:'↻ Сброс'},
+ zh:{lead:'领先国家',hits:'巨球撞击次数',total:'球总数',countries:'各国球数',exit:'退出录制视图',refresh:'↻ 重置'},
+ ja:{lead:'リード国',hits:'巨大ボールのヒット',total:'ボール合計',countries:'国別ボール',exit:'終了',refresh:'↻ リセット'},
+ ko:{lead:'선두 국가',hits:'자이언트 볼 충돌',total:'전체 공',countries:'국가별 공',exit:'나가기',refresh:'↻ 초기화'},
+ ms:{lead:'NEGARA TERDAHULU',hits:'HENTAMAN BOLA GERGASI',total:'JUMLAH BOLA',countries:'BOLA MENGIKUT NEGARA',exit:'Keluar',refresh:'↻ Mula semula'},
+ sw:{lead:'NCHI INAYOONGOZA',hits:'MAPIGO YA MPIRA MKUBWA',total:'JUMLA YA MIPIRA',countries:'MIPIRA KWA NCHI',exit:'Toka',refresh:'↻ Anza upya'},
+ nl:{lead:'LEIDEND LAND',hits:'RAKEN VAN REUZENBAL',total:'TOTAAL BALLEN',countries:'BALLEN PER LAND',exit:'Afsluiten',refresh:'↻ Opnieuw'},
+ pl:{lead:'PROWADZĄCY KRAJ',hits:'TRAFIENIA WIELKIEJ KULI',total:'ŁĄCZNIE KULEK',countries:'KULKI KRAJÓW',exit:'Wyjdź',refresh:'↻ Reset'}
+};
+function applyCaptureLanguage(){const t=translations[$('captureLanguage')?.value||'en']||translations.en;const spans=document.querySelectorAll('.capture-chip span');if(spans[0])spans[0].textContent=t.lead;if(spans[1])spans[1].textContent=t.hits;if(spans[2])spans[2].textContent=t.total;const title=document.querySelector('.capture-country-counts .mini-title');if(title)title.textContent=t.countries;$('captureExit').textContent=t.exit;$('captureRefresh').textContent=t.refresh;}
+$('captureLanguage').addEventListener('change',applyCaptureLanguage);$('gameLanguage').addEventListener('change',()=>{ $('captureLanguage').value=$('gameLanguage').value;applyCaptureLanguage();showToast('LANGUAGE UPDATED','Capture overlay labels updated for selected language.',1300);});
+function enterCapture(){applyCaptureLanguage();document.body.classList.add('capture-mode');if(document.documentElement.requestFullscreen){document.documentElement.requestFullscreen().catch(()=>{});} }
+function exitCapture(){document.body.classList.remove('capture-mode');if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{});}
+$('capture').addEventListener('click',enterCapture);
+$('captureExit').addEventListener('click',exitCapture);$('captureRefresh').addEventListener('click',()=>{reset();if(!running){running=true;$('play').textContent='Ⅱ Pause';last=performance.now();raf=requestAnimationFrame(frame)}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')exitCapture()});
+let lastTap=0;canvas.addEventListener('pointerdown',e=>{if(document.body.classList.contains('capture-mode')){const now=Date.now();if(now-lastTap<350){exitCapture();lastTap=0;return}lastTap=now;}});
+canvas.addEventListener('pointerdown',e=>{const rect=canvas.getBoundingClientRect(),x=(e.clientX-rect.left)*W/rect.width,y=(e.clientY-rect.top)*H/rect.height;let nearest=null,nd=Infinity;for(const b of balls){const d=Math.hypot(b.x-x,b.y-y);if(d<nd){nd=d;nearest=b}}if(nearest&&nd<55){spawn(nearest.ni,nearest.x+rand(-22,22),nearest.y+rand(-22,22),true);updateStats();draw()}else{const i=Math.floor(Math.random()*nations.length);spawn(i,x,y,true);updateStats();draw()}});
+$('numberCountries').value=String(selectedCountries.size);renderSelectedCountries();reset();$('countryBallCount').value='1';draw();running=true;$('play').textContent='Ⅱ Pause';last=performance.now();raf=requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
